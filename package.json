@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "name": "aaa-capturegame",
+  "version": "1.0.0",
+  "main": "server.js",
+  "devDependencies": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

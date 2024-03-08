@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Simple Socket.io Game</title>
+    <style>
+      canvas {
+        border: 1px solid black;
+        background: #f0f0f0;
+        display: block;
+        margin: 0 auto;
+      }
+
+      .button-container {
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      button {
+        margin: 0 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div class="button-container">
+      <button id="wallButton">Place Wall</button>
+      <button id="beaconButton">Place Beacon</button>
+      <button id="mineButton">Place Mine</button>
+    </div>
+    <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+
+      const socket = io();
+
+      let selectedObject = ""; // Track the selected object
+
+      const wallButton = document.getElementById("wallButton");
+      const beaconButton = document.getElementById("beaconButton");
+      const mineButton = document.getElementById("mineButton");
+
+      mineButton.addEventListener("click", () => {
+  selectedObject = "mine";
+  highlightButton(mineButton);
+  removeHighlight(wallButton);
+  removeHighlight(beaconButton);
+});
+
+wallButton.addEventListener("click", () => {
+  selectedObject = "wall";
+  highlightButton(wallButton);
+  removeHighlight(beaconButton);
+  removeHighlight(mineButton);
+});
+
+beaconButton.addEventListener("click", () => {
+  selectedObject = "beacon";
+  highlightButton(beaconButton);
+  removeHighlight(wallButton);
+  removeHighlight(mineButton);
+});
+
+function highlightButton(button) {
+  button.style.backgroundColor = "#3498db";
+  button.style.color = "#fff";
+}
+
+function removeHighlight(button) {
+  button.style.backgroundColor = "";
+  button.style.color = "";
+}
+
+      canvas.addEventListener("click", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        if (selectedObject === "wall") {
+          socket.emit("placeWall", { x: mouseX, y: mouseY });
+        } else if (selectedObject === "beacon") {
+          socket.emit("placeBeacon");
+        } else if (selectedObject === "mine") {
+  socket.emit("placeMine", { x: mouseX, y: mouseY });
+}
+      });
+
+      const playerMovement = {
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+      };
+
+      const keyDownHandler = (e) => {
+        if (e.keyCode == 39) {
+          playerMovement.right = true;
+        } else if (e.keyCode == 37) {
+          playerMovement.left = true;
+        } else if (e.keyCode == 38) {
+          playerMovement.up = true;
+        } else if (e.keyCode == 40) {
+          playerMovement.down = true;
+        } 
+      };
+
+      canvas.addEventListener("click", (e) => {
+        if (selectedObject == "wall")
+        {
+          const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        socket.emit("placeWall", { x: mouseX, y: mouseY });
+        }
+      });
+
+      const keyUpHandler = (e) => {
+        if (e.keyCode == 39) {
+          playerMovement.right = false;
+        } else if (e.keyCode == 37) {
+          playerMovement.left = false;
+        } else if (e.keyCode == 38) {
+          playerMovement.up = false;
+        } else if (e.keyCode == 40) {
+          playerMovement.down = false;
+        }
+      };
+
+      setInterval(() => {
+        socket.emit("playerMovement", playerMovement);
+      }, 1000 / 60);
+
+      document.addEventListener("keydown", keyDownHandler, false);
+      document.addEventListener("keyup", keyUpHandler, false);
+
+      socket.on("state", (gameState) => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Render players and their gold
+  for (let playerId in gameState.players) {
+    const player = gameState.players[playerId];
+    ctx.beginPath();
+    ctx.rect(player.x, player.y, player.width, player.height);
+    ctx.fillStyle = "#0095DD";
+    ctx.fill();
+    ctx.closePath();
+
+    // Display player gold text
+    ctx.fillStyle = "black";
+    ctx.font = "14px Arial";
+    ctx.fillText(`Gold: ${player.gold}`, player.x - 10, player.y - 10);
+
+    for (let mineId in gameState.mines) {
+  const mine = gameState.mines[mineId];
+  ctx.beginPath();
+  ctx.rect(mine.x, mine.y, mine.width, mine.height);
+  ctx.fillStyle = "yellow";
+  ctx.fill();
+  ctx.closePath();
+}
+  }
+
+        // Render beacons
+        for (let beaconId in gameState.beacons) {
+          const beacon = gameState.beacons[beaconId];
+          const centerX = beacon.x + beacon.width / 2 - 10;
+          const centerY = beacon.y + beacon.height / 2 - 10;
+          const radius = beacon.width / 2;
+
+          ctx.save(); // Save the current context state
+
+          // Set the global alpha to make the outer circle transparent
+          ctx.globalAlpha = 0.5; // Change the transparency level here (0 is fully transparent, 1 is opaque)
+
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+          ctx.fillStyle = beacon.color;
+          ctx.fill();
+
+          // Reset the global alpha to its default value
+          ctx.globalAlpha = 1;
+
+          // Black dot in the middle
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius / 8, 0, Math.PI * 2);
+          ctx.fillStyle = "black";
+          ctx.fill();
+          ctx.closePath();
+
+          ctx.restore(); // Restore the context to its previous state
+        }
+
+        // Render walls
+        for (let wallId in gameState.walls) {
+          const wall = gameState.walls[wallId];
+          ctx.beginPath();
+          ctx.rect(wall.x, wall.y, wall.width, wall.height);
+          ctx.fillStyle = "#8B4513";
+          ctx.fill();
+          ctx.closePath();
+        }
+      });
+    </script>
+  </body>
+</html>
